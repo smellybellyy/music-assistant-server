@@ -881,6 +881,13 @@ class SyncGroupPlayer(Player):
         self.sync_leader = None
         self._update_attributes()
         self.update_state()
+        # The members derive their active_group from this group's session
+        # (is_active_session), which just ended. When the dissolve leaves the group's
+        # own state unchanged (the queue ran out and the idle grace dissolved it), no
+        # state event reaches the members, so they keep reporting this group as active
+        # (and stay hidden in the UI) until their next own state change.
+        for member_id in self._attr_group_members:
+            self.mass.players.trigger_player_update(member_id)
 
     def _select_sync_leader(
         self,
