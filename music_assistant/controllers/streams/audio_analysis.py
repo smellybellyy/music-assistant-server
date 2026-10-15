@@ -51,7 +51,7 @@ BACKGROUND_SCAN_TASK_ID = "audio_analysis_background_scan"
 BACKGROUND_PER_TRACK_TIMEOUT_SECONDS = 300
 BACKGROUND_PER_TRACK_TIMEOUT_DURATION_MULTIPLIER = 1.5
 # Per-run wall-clock cap; in-flight tracks finish, new ones defer to the next run.
-BACKGROUND_SCAN_RUN_BUDGET_SECONDS = 4 * 3600
+BACKGROUND_SCAN_RUN_BUDGET_SECONDS = 12 * 3600
 # Per-chunk processing ceiling for live and background analysis; a provider that exceeds it is
 # treated as stuck and evicted. Generous because analysis runs one offload at a time while a
 # player streams, so a chunk may wait behind other work before it computes.
@@ -59,7 +59,9 @@ CHUNK_HANG_GUARD_SECONDS = 120.0
 # Floor on wall-seconds between consecutive background chunk dispatches (one chunk = one
 # audio-second), capping each scanned track at ~4x realtime so a background analyse doesn't
 # consume all resources. Nice and slow is preferred for nightly background scans.
-BACKGROUND_PACE_INTERVAL_SECONDS_FLOOR = 0.250
+# 0.050 (20x realtime) rather than upstream's 0.250: the workers are niced anyway, and a
+# 39,000-track library at 4x would take weeks of nightly runs.
+BACKGROUND_PACE_INTERVAL_SECONDS_FLOOR = 0.050
 # OS nice value for analysis worker threads (Linux): keeps analysis below playback so the
 # scheduler favors the event loop and ffmpeg under contention.
 ANALYSIS_THREAD_NICE = 10
@@ -1028,7 +1030,7 @@ class AudioAnalysisController:
                 self.logger.debug("Skipping %s: stream details failed: %s", item_id, err)
                 return
 
-            if streamdetails.stream_type != StreamType.LOCAL_FILE:
+            if streamdetails.stream_type not in (StreamType.LOCAL_FILE, StreamType.HTTP):
                 return
             if not isinstance(streamdetails.path, str) or not streamdetails.path:
                 return
@@ -1179,10 +1181,16 @@ class AudioAnalysisController:
             self._finalize_providers(session_key)
 
     def _available_filesystem_domains(self) -> tuple[str, ...]:
-        """Return configured filesystem provider domains that are currently available."""
+        """
+        Return configured provider domains whose tracks the background scan may analyse.
+
+        Filesystem providers as upstream, plus OpenSubsonic: a Navidrome library streams over
+        HTTP, which ffmpeg decodes exactly like a local file, and without this the library would
+        only ever be analysed track by track as it is played.
+        """
         return tuple(
             domain
-            for domain in FILESYSTEM_PROVIDER_DOMAINS
+            for domain in (*FILESYSTEM_PROVIDER_DOMAINS, "opensubsonic")
             if any(
                 p.domain == domain and p.available
                 for p in self.mass.get_providers(ProviderType.MUSIC)
