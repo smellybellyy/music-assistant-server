@@ -21,7 +21,10 @@ DEFAULT_PLAYER_VOLUME = 20
 DEFAULT_VISUALIZATION = SlimVisualisationType.NONE
 
 # sync constants
-MIN_DEVIATION_ADJUST = 8  # 5 milliseconds
+# A Wi-Fi player is nudged every few seconds at 8 ms: inaudible, but a correction is a
+# skip or a pause in the audio. 20 ms is still well below what two players in one room
+# reveal as an echo.
+MIN_DEVIATION_ADJUST = 20  # milliseconds
 MIN_REQ_PLAYPOINTS = 8  # we need at least 8 measurements
 DEVIATION_JUMP_IGNORE = 500  # ignore a sudden unrealistic jump
 MAX_SKIP_AHEAD_MS = 800  # 0.8 seconds
