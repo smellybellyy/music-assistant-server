@@ -673,6 +673,14 @@ class SqueezelitePlayer(Player):
         )
 
         sync_playpoints.append(SyncPlayPoint(now, sync_master.player_id, diff))
+        self.logger.debug(
+            "%s sync gap to %s: %sms (%s/%s samples)",
+            self.display_name,
+            sync_master.name,
+            diff,
+            len(sync_playpoints),
+            MIN_REQ_PLAYPOINTS,
+        )
 
         # ignore unexpected spikes
         if (
@@ -686,8 +694,9 @@ class SqueezelitePlayer(Player):
         if len(sync_playpoints) < min_req_playpoints:
             return
 
-        # get the average diff
-        avg_diff = statistics.fmean(x.diff for x in sync_playpoints)
+        # the median, not the mean: one late position report over Wi-Fi reads as a lag of
+        # hundreds of ms and would otherwise be corrected as if it were real
+        avg_diff = statistics.median(x.diff for x in sync_playpoints)
         delta = int(abs(avg_diff))
 
         if delta < MIN_DEVIATION_ADJUST:
