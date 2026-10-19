@@ -1654,3 +1654,47 @@ async def test_get_wave_form_none_without_rms() -> None:
     """wave_form returns None when no AA provider stored RMS energy."""
     c = _analysis_controller_with_rows([_aa_row(SMART_FADES_ANALYSIS_DOMAIN, 1, bpm=120.0)])
     assert await c.get_wave_form("track-1", "test-provider") is None
+
+
+# --- tag loudness never replaces a stored row (smelly fix) ---
+
+
+def _music_provider_stub() -> MagicMock:
+    music_prov = MagicMock(spec=MusicProvider)
+    music_prov.is_streaming_provider = True
+    music_prov.domain = "test-provider"
+    return music_prov
+
+
+@pytest.mark.asyncio
+async def test_set_track_loudness_keeps_an_existing_row() -> None:
+    """A loudness row that is already stored (measured or from tags) is never replaced by a tag."""
+    c, db = _stub_controller()
+    db.get_row = AsyncMock(return_value={"analysis_version": 2})
+    db.insert_or_replace = AsyncMock()
+    c.mass.get_provider = MagicMock(return_value=_music_provider_stub())  # type: ignore[method-assign]
+
+    await c.set_track_loudness("track-1", "test-provider", -9.0, loudness_album=-8.5)
+
+    db.insert_or_replace.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_set_track_loudness_writes_a_new_row_at_the_providers_version() -> None:
+    """Without a stored row the tag value is written at the loudness provider's current version."""
+    c, db = _stub_controller()
+    db.get_row = AsyncMock(return_value=None)
+    db.insert_or_replace = AsyncMock()
+    c.mass.get_provider = MagicMock(return_value=_music_provider_stub())  # type: ignore[method-assign]
+    aa_loud = MagicMock(spec=AudioAnalysisProvider)
+    aa_loud.domain = LOUDNESS_ANALYSIS_DOMAIN
+    aa_loud.available = True
+    aa_loud.analysis_version = 2
+    c.mass.get_providers = MagicMock(return_value=[aa_loud])  # type: ignore[method-assign]
+
+    await c.set_track_loudness("track-1", "test-provider", -9.0, loudness_album=-8.5)
+
+    db.insert_or_replace.assert_awaited_once()
+    _table, row = db.insert_or_replace.await_args.args
+    assert row["aa_provider_domain"] == LOUDNESS_ANALYSIS_DOMAIN
+    assert row["analysis_version"] == 2

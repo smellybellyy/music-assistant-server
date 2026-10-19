@@ -662,15 +662,35 @@ class AudioAnalysisController:
             or loudness_album <= LOUDNESS_MEASUREMENT_MIN_LUFS
         ):
             loudness_album = None
+        # A tag never replaces a row that is already there. Music providers call this on
+        # every listing of a track (library sync, album, playlist, search), and it used to
+        # insert_or_replace the loudness_analysis row with analysis_version 1: a row the
+        # loudness provider (analysis_version 2) had measured went back to the tag value on
+        # the next sync, counted as stale, and the background scan re-measured the whole
+        # library every run while the sonic pass behind it starved. A row that exists is
+        # kept, and a new one is written at the provider's current version so it is never
+        # stale. (Upstream dev keeps tag loudness under its own provider_loudness domain.)
+        if (
+            await self.get_audio_analysis_version(
+                item_id, provider_instance_id_or_domain, LOUDNESS_ANALYSIS_DOMAIN, media_type
+            )
+            is not None
+        ):
+            return
         analysis = AudioAnalysisData(
             loudness_integrated=loudness,
             loudness_album=loudness_album,
+        )
+        current_version = next(
+            (p.analysis_version for p in self.providers if p.domain == LOUDNESS_ANALYSIS_DOMAIN),
+            1,
         )
         await self.set_audio_analysis(
             item_id=item_id,
             provider_instance_id_or_domain=provider_instance_id_or_domain,
             aa_provider_domain=LOUDNESS_ANALYSIS_DOMAIN,
             analysis=analysis,
+            analysis_version=current_version,
             media_type=media_type,
         )
 
