@@ -88,6 +88,10 @@ class PlaybackTrackerMixin(_PlayerQueuesBase):
                 # (already returned in media-time)
                 current_index, elapsed_time = self._get_flow_queue_stream_index(queue, player)
             elif item_id := self._parse_player_current_item_id(queue_id, player):
+                if self._is_stale_player_item(queue_id, item_id):
+                    # the player still names the item it played before the skip;
+                    # keep the queue on the item it was just handed
+                    return False
                 # normal mode, the player itself will report the current item
                 elapsed_time = player.state.corrected_elapsed_time or 0
                 current_index = self.index_by_id(queue_id, item_id)
@@ -382,6 +386,21 @@ class PlaybackTrackerMixin(_PlayerQueuesBase):
             # so we just return the queue index and the elapsed time
             return queue.current_index, queue.elapsed_time
         return queue_index, track_time
+
+    def _is_stale_player_item(self, queue_id: str, item_id: str) -> bool:
+        """
+        Return True if the player reports another item than the one it was just handed.
+
+        Holds only until the player reports the awaited item or the start timeout passes,
+        so a player that never switches cannot pin the queue to an item it is not playing.
+        """
+        queue_data = self._queue_data[queue_id]
+        if queue_data.awaited_item_id is None:
+            return False
+        if item_id == queue_data.awaited_item_id or time.monotonic() > queue_data.awaited_until:
+            queue_data.awaited_item_id = None
+            return False
+        return True
 
     def _parse_player_current_item_id(self, queue_id: str, player: Player) -> str | None:
         """Parse QueueItem ID from Player's current url."""
