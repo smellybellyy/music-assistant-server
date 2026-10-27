@@ -66,6 +66,11 @@ class PlayerQueueData:
     # runtime-only fields below; not persisted, reset to these defaults on restart
     prev_state: CompareState | None = None
     transitioning: bool = False
+    # the queue item a play_index just handed the player, and until when (time.monotonic) a
+    # report naming any other item means the player has not switched yet, rather than that the
+    # queue went back to that item
+    awaited_item_id: str | None = None
+    awaited_until: float = 0.0
     play_action_refcount: int = 0
     last_counted_play: str | None = None
     # session_id whose flow stream was fully generated

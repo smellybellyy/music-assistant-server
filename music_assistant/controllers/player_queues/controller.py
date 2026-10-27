@@ -1091,6 +1091,9 @@ class PlayerQueuesController(QueueLoaderMixin, PlaybackTrackerMixin, StreamFeede
                 queue.current_index = index
                 queue.current_item = queue_item
                 self.signal_update(queue_id)
+            # a player that was already playing satisfies the wait above with the item it
+            # played before, and goes on naming that item until the new one starts
+            self._await_item(queue_id, queue_item.queue_item_id)
         finally:
             self._set_transitioning(queue_id, False)
 
@@ -1908,6 +1911,12 @@ class PlayerQueuesController(QueueLoaderMixin, PlaybackTrackerMixin, StreamFeede
         """Mark (or clear) whether a queue is mid-transition (no-op if it is not registered)."""
         if (queue_data := self._queue_data.get(queue_id)) is not None:
             queue_data.transitioning = value
+
+    def _await_item(self, queue_id: str, queue_item_id: str) -> None:
+        """Hold the queue on the item just handed to the player until the player reports it."""
+        if (queue_data := self._queue_data.get(queue_id)) is not None:
+            queue_data.awaited_item_id = queue_item_id
+            queue_data.awaited_until = time.monotonic() + PLAYBACK_START_TIMEOUT
 
     def _last_played_position(self, queue: PlayerQueue) -> float:
         """Return where the current item last played, kept when the player resets it."""
