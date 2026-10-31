@@ -780,7 +780,8 @@ class MediaControllerBase[ItemCls: "MediaItemType"](metaclass=ABCMeta):
                         'provider_instance', pm.provider_instance,
                         'available', pm.available,
                         'in_library', pm.in_library,
-                        'is_unique', pm.is_unique
+                        'is_unique', pm.is_unique,
+                        'details', pm.details
                     )) FROM provider_mappings pm WHERE pm.item_id = {self.db_table}.item_id
                         AND pm.media_type = '{self.media_type.value}') AS provider_mappings
                 {extra_columns}
@@ -2243,6 +2244,7 @@ class MediaControllerBase[ItemCls: "MediaItemType"](metaclass=ABCMeta):
                 available=bool(raw_mapping["available"]),
                 in_library=parse_optional_bool(raw_mapping["in_library"]),
                 is_unique=parse_optional_bool(raw_mapping["is_unique"]),
+                details=raw_mapping.get("details"),
             )
             for raw_mapping in json_loads(db_row["provider_mappings"])
         }

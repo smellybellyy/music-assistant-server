@@ -2034,6 +2034,12 @@ class MusicProvider(Provider):
             if provider_mapping.is_unique != library_mapping.is_unique:
                 # unique status doesn't match
                 return False
+            if (
+                provider_mapping.details is not None
+                and provider_mapping.details != library_mapping.details
+            ):
+                # provider specific details (e.g. the file's path) changed
+                return False
             # check if the library item has all provider instances mappings
             is_unique = provider_mapping.is_unique or (not self.is_streaming_provider)
             if not is_unique:

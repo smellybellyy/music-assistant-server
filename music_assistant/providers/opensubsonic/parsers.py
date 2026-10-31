@@ -161,6 +161,9 @@ def parse_track(  # noqa: PLR0915
                     channels=sonic_song.channel_count or 2,
                     bit_rate=sonic_song.bit_rate,
                 ),
+                # the file as the server reports it (Navidrome: the real path relative to the
+                # library only when "Report Real Path" is on for the client, else a made-up one)
+                details=sonic_song.path or None,
             )
         },
         track_number=sonic_song.track or 0,
