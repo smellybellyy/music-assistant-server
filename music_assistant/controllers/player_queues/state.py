@@ -67,6 +67,8 @@ class PlayerQueueData:
     prev_state: CompareState | None = None
     transitioning: bool = False
     play_action_refcount: int = 0
+    # monotonic time of the last next/previous press, for their debounce
+    last_skip_press: float | None = None
     last_counted_play: str | None = None
     # session_id whose flow stream was fully generated
     flow_buffer_completed: str | None = None
