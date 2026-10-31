@@ -72,6 +72,8 @@ class PlayerQueueData:
     awaited_item_id: str | None = None
     awaited_until: float = 0.0
     play_action_refcount: int = 0
+    # monotonic time of the last next/previous press, for their debounce
+    last_skip_press: float | None = None
     last_counted_play: str | None = None
     # session_id whose flow stream was fully generated
     flow_buffer_completed: str | None = None

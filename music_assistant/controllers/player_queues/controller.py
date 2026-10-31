@@ -70,6 +70,7 @@ from music_assistant.controllers.player_queues.constants import (
     DEFAULT_CROSSFADE_ENABLED,
     PLAYBACK_START_TIMEOUT,
     QUEUE_CACHE_SAVE_DELAY,
+    SKIP_DEBOUNCE,
 )
 from music_assistant.controllers.player_queues.helpers import (
     committed_index,
@@ -795,14 +796,7 @@ class PlayerQueuesController(QueueLoaderMixin, PlaybackTrackerMixin, StreamFeede
         if queue_player := self.mass.players.get_player(queue_id, True):
             queue_player.update_state()
 
-        # debounce rapid next button presses using call_later
-        self.mass.call_later(
-            1,
-            self.play_index,
-            queue_id,
-            next_index,
-            task_id=f"queue_play_index_{queue_id}",
-        )
+        self._play_index_debounced(queue_id, next_index)
 
     @api_command("player_queues/previous", required_scope=Scope.QUEUES_CONTROL)
     @handle_play_action
@@ -834,12 +828,28 @@ class PlayerQueuesController(QueueLoaderMixin, PlaybackTrackerMixin, StreamFeede
         if queue_player := self.mass.players.get_player(queue_id, True):
             queue_player.update_state()
 
-        # debounce rapid previous button presses using call_later
+        self._play_index_debounced(queue_id, prev_index)
+
+    def _play_index_debounced(self, queue_id: str, index: int) -> None:
+        """
+        Play the item a next/previous press moved to, debouncing rapid presses.
+
+        The first press plays at once; a press within SKIP_DEBOUNCE of the one before replaces
+        the pending play and waits out the window, so a burst of presses plays only its last item.
+
+        :param queue_id: queue_id of the queue to handle the command.
+        :param index: index of the queue item to play.
+        """
+        queue_data = self._queue_data[queue_id]
+        now = time.monotonic()
+        last_press = queue_data.last_skip_press
+        queue_data.last_skip_press = now
+        in_burst = last_press is not None and now - last_press < SKIP_DEBOUNCE
         self.mass.call_later(
-            1,
+            SKIP_DEBOUNCE if in_burst else 0,
             self.play_index,
             queue_id,
-            prev_index,
+            index,
             task_id=f"queue_play_index_{queue_id}",
         )
 

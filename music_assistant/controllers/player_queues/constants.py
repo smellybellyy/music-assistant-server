@@ -112,6 +112,11 @@ CACHE_CATEGORY_PLAYER_QUEUE_ITEMS = 1
 # reports PLAYING, capped by this timeout so a player that never reports state can't block.
 PLAYBACK_START_TIMEOUT = 5.0
 
+# Next/previous presses within this many seconds of the one before are collected and only the
+# last one is played, so pressing several times skips several items in one go. The first press
+# of a burst plays at once instead of waiting out the window.
+SKIP_DEBOUNCE = 1.0
+
 # The queue's cached state/items are written through a debounced timer, so a burst of updates (or
 # the per-track updates during playback) collapses into a single write instead of hitting the cache
 # db on every signal_update.
